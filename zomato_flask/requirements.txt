@@ -1,7 +1,5 @@
-@"
 flask
 gunicorn
 pandas
 numpy
 scikit-learn
-"@ | Set-Content zomato_flask\requirements.txt
