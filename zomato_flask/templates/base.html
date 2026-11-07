@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Restaurant Lab{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <aside class="rail">
+    <a class="brand" href="{{ url_for('task1') }}">Restaurant Lab</a>
+    <p class="brand-sub">Zomato data, four ML tasks</p>
+    <nav>
+      <a href="{{ url_for('task1') }}" class="{{ 'on' if page == 'task1' }}">
+        <b>Task 1</b><span>Predict a rating</span></a>
+      <a href="{{ url_for('task2') }}" class="{{ 'on' if page == 'task2' }}">
+        <b>Task 2</b><span>Find restaurants</span></a>
+      <a href="{{ url_for('task3') }}" class="{{ 'on' if page == 'task3' }}">
+        <b>Task 3</b><span>Classify a cuisine</span></a>
+      <a href="{{ url_for('task4') }}" class="{{ 'on' if page == 'task4' }}">
+        <b>Task 4</b><span>Explore locations</span></a>
+    </nav>
+  </aside>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

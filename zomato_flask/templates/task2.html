@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Find restaurants{% endblock %}
+{% block content %}
+<h1>Find restaurants you'd like</h1>
+<p class="lede">Type the cuisines you enjoy. Results are ranked by how closely their cuisines match, then by rating.</p>
+
+<form method="post" class="panel wide">
+  <div class="row three">
+    <label>Cuisines (comma separated)
+      <input type="text" name="cuisine" value="{{ form.get('cuisine', '') }}" placeholder="North Indian, Chinese" required>
+    </label>
+    <label>Price range
+      <select name="price_range">
+        <option value="">Any</option>
+        {% for p in [1,2,3,4] %}<option value="{{ p }}" {{ 'selected' if form.get('price_range')|string == p|string }}>{{ p }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>City
+      <select name="city">
+        <option value="">Any</option>
+        {% for c in cities %}<option value="{{ c }}" {{ 'selected' if form.get('city') == c }}>{{ c }}</option>{% endfor %}
+      </select>
+    </label>
+  </div>
+  <button type="submit">Show recommendations</button>
+</form>
+
+{% if results is not none %}
+  {% if results %}
+  <div class="panel wide">
+    <table>
+      <tr><th>Restaurant</th><th>City</th><th>Cuisines</th><th class="n">Price</th><th class="n">Rating</th><th class="n">Match</th></tr>
+      {% for r in results %}
+      <tr>
+        <td><b>{{ r['Restaurant Name'] }}</b></td>
+        <td>{{ r['City'] }}</td>
+        <td>{{ r['Cuisines'] }}</td>
+        <td class="n">{{ r['Price range'] }}</td>
+        <td class="n">{{ r['Aggregate rating'] }}</td>
+        <td class="n">{{ r['score']|int }}%</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% else %}
+  <div class="panel wide"><p>No restaurants match these filters. Try another price range or set the city to Any.</p></div>
+  {% endif %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Explore locations{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+{% endblock %}
+{% block content %}
+<h1>Where the restaurants are</h1>
+<p class="lede">{{ '{:,}'.format(t4.total) }} restaurants across {{ t4.n_cities }} cities in {{ t4.n_countries }} countries. Click anywhere on the map to see the nearest restaurants.</p>
+
+<div class="split map-split">
+  <div class="panel flush">
+    <div id="map"></div>
+    <div class="legend">
+      <span><i style="background:#C8372D"></i> below 3</span>
+      <span><i style="background:#F4A300"></i> 3 to 4</span>
+      <span><i style="background:#1F7A5C"></i> above 4</span>
+      <span class="muted">Showing a sample of {{ t4.points|length }} restaurants</span>
+    </div>
+  </div>
+  <div class="panel" id="nearby">
+    <h2>Nearest restaurants</h2>
+    <p class="note" id="nearby-empty">Click a spot on the map.</p>
+    <ul class="list" id="nearby-list"></ul>
+  </div>
+</div>
+
+<div class="split even">
+  <div class="panel">
+    <h2>Cities with the most restaurants</h2>
+    <canvas id="cities" height="200"></canvas>
+  </div>
+  <div class="panel">
+    <h2>City summary</h2>
+    <label>Choose a city
+      <select id="city-pick">
+        {% for c in cities %}<option value="{{ c }}" {{ 'selected' if c == 'New Delhi' }}>{{ c }}</option>{% endfor %}
+      </select>
+    </label>
+    <div id="city-out" class="city-out"></div>
+  </div>
+</div>
+
+<div class="panel wide">
+  <h2>Top 15 cities by restaurant count</h2>
+  <div class="scroll">
+  <table>
+    <tr><th>City</th><th class="n">Restaurants</th><th class="n">Avg rating</th><th class="n">Avg cost for two</th><th class="n">Avg price range</th><th>Most common cuisine</th></tr>
+    {% for r in t4.stats %}
+    <tr>
+      <td><b>{{ r.City }}</b></td><td class="n">{{ r.restaurants }}</td><td class="n">{{ r.avg_rating }}</td>
+      <td class="n">{{ r.avg_cost }}</td><td class="n">{{ r.avg_price_range }}</td><td>{{ r.top_cuisine }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+  <p class="note">Costs are in each country's local currency, so compare them only within one country.</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+  const pts = {{ t4.points|tojson }};
+  const map = L.map('map').setView([22, 78], 4);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+  const colour = r => r < 3 ? '#C8372D' : (r <= 4 ? '#F4A300' : '#1F7A5C');
+  pts.forEach(p => {
+    L.circleMarker([p.Latitude, p.Longitude], { radius: 4, weight: 0, fillOpacity: .7,
+      fillColor: colour(p['Aggregate rating']) })
+     .bindPopup('<b>' + p['Restaurant Name'] + '</b><br>' + p.City + ' · ' + p['Aggregate rating'])
+     .addTo(map);
+  });
+
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+  let pin;
+  map.on('click', async e => {
+    if (pin) map.removeLayer(pin);
+    pin = L.marker(e.latlng).addTo(map);
+    const res = await fetch(`/api/nearby?lat=${e.latlng.lat}&lon=${e.latlng.lng}`);
+    const data = await res.json();
+    document.getElementById('nearby-empty').style.display = 'none';
+    document.getElementById('nearby-list').innerHTML = data.map(r =>
+      `<li><b>${esc(r['Restaurant Name'])}</b><span>${esc(r.City)} · ${esc(r.Cuisines || 'cuisine not listed')}</span>
+       <em>${r['Aggregate rating']} rating · price ${r['Price range']}</em></li>`).join('');
+  });
+
+  new Chart(document.getElementById('cities'), {
+    type: 'bar',
+    data: { labels: {{ t4.city_labels|tojson }},
+            datasets: [{ data: {{ t4.city_values|tojson }}, backgroundColor: '#14232F', borderRadius: 3 }] },
+    options: { plugins: { legend: { display: false } },
+               scales: { y: { grid: { color: '#e3e8ef' } }, x: { grid: { display: false } } } }
+  });
+
+  async function loadCity() {
+    const name = document.getElementById('city-pick').value;
+    const res = await fetch('/api/city?name=' + encodeURIComponent(name));
+    const d = await res.json();
+    const out = document.getElementById('city-out');
+    if (d.error) { out.textContent = d.error; return; }
+    const cuis = Object.entries(d.top_cuisines).map(([k, v]) => `${esc(k)} (${v})`).join(', ');
+    const loc = d.localities.map(l =>
+      `<tr><td>${esc(l.Locality)}</td><td class="n">${l.restaurants}</td><td class="n">${l.avg_rating}</td></tr>`).join('');
+    out.innerHTML = `
+      <p><b>${d.restaurants}</b> restaurants, average rating <b>${d.avg_rating}</b>, average cost for two <b>${d.avg_cost}</b></p>
+      <p class="note">Top cuisines: ${cuis || 'not listed'}</p>
+      ${loc ? `<table><tr><th>Best-rated localities</th><th class="n">Restaurants</th><th class="n">Rating</th></tr>${loc}</table>` : ''}`;
+  }
+  document.getElementById('city-pick').addEventListener('change', loadCity);
+  loadCity();
+</script>
+{% endblock %}

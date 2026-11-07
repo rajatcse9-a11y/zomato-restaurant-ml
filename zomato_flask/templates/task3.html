@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Classify a cuisine{% endblock %}
+{% block content %}
+<h1>Guess a restaurant's cuisine</h1>
+<p class="lede">Give the restaurant's location, price and popularity. The model returns its three most likely main cuisines.</p>
+
+<div class="split">
+  <form method="post" class="panel">
+    <label>City
+      <select name="city">
+        {% for c in t3.cities %}<option value="{{ c }}" {{ 'selected' if form.get('city') == c }}>{{ c }}</option>{% endfor %}
+      </select>
+    </label>
+    <div class="row">
+      <label>Price range
+        <select name="price_range">
+          {% for p in [1,2,3,4] %}<option value="{{ p }}" {{ 'selected' if form.get('price_range')|string == p|string }}>{{ p }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Rating
+        <input type="number" step="0.1" min="0" max="5" name="rating" value="{{ form.get('rating', 3.8) }}">
+      </label>
+    </div>
+    <div class="row">
+      <label>Votes
+        <input type="number" min="0" name="votes" value="{{ form.get('votes', 250) }}">
+      </label>
+      <label>Average cost for two
+        <input type="number" min="0" name="avg_cost" value="{{ form.get('avg_cost', 600) }}">
+      </label>
+    </div>
+    <div class="checks">
+      <label class="check"><input type="checkbox" name="table_booking" {{ 'checked' if form.get('table_booking') }}> Table booking</label>
+      <label class="check"><input type="checkbox" name="online_delivery" {{ 'checked' if form.get('online_delivery') }}> Online delivery</label>
+    </div>
+    <div class="row">
+      <label>Latitude (optional)
+        <input type="text" name="latitude" value="{{ form.get('latitude', '') }}" placeholder="city centre">
+      </label>
+      <label>Longitude (optional)
+        <input type="text" name="longitude" value="{{ form.get('longitude', '') }}" placeholder="city centre">
+      </label>
+    </div>
+    <button type="submit">Predict cuisine</button>
+  </form>
+
+  <div>
+    <div class="panel result {{ 'empty' if result is none }}">
+      {% if result is not none %}
+        <p class="small">Most likely cuisines</p>
+        {% for r in result %}
+        <div class="bar-row">
+          <span>{{ r.cuisine }}</span>
+          <div class="meter"><i style="width: {{ r.prob }}%"></i></div>
+          <b>{{ r.prob }}%</b>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="small">Fill the form and press "Predict cuisine".</p>
+      {% endif %}
+    </div>
+
+    <div class="panel">
+      <h2>Overall accuracy</h2>
+      <table>
+        <tr><th>Model</th><th class="n">Accuracy</th></tr>
+        {% for m in t3.acc %}
+        <tr><td>{{ m.model }}</td><td class="n">{{ m.accuracy }}</td></tr>
+        {% endfor %}
+      </table>
+      <p class="note">The model only sees location, price, rating and votes, not the menu, so similar cuisines get mixed up.</p>
+    </div>
+  </div>
+</div>
+
+<div class="panel wide">
+  <h2>Performance by cuisine (Random Forest, test set)</h2>
+  <table>
+    <tr><th>Cuisine</th><th class="n">Precision</th><th class="n">Recall</th><th class="n">F1</th><th class="n">Restaurants</th></tr>
+    {% for r in t3.report %}
+    <tr><td>{{ r.cuisine }}</td><td class="n">{{ r.precision }}</td><td class="n">{{ r.recall }}</td><td class="n">{{ r.f1 }}</td><td class="n">{{ r.support }}</td></tr>
+    {% endfor %}
+  </table>
+  <p class="note">Cuisines with few restaurants usually have lower recall. That is the class imbalance bias to mention in your report.</p>
+</div>
+{% endblock %}

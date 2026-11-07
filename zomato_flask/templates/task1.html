@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Predict a rating{% endblock %}
+{% block content %}
+<h1>Predict a restaurant's rating</h1>
+<p class="lede">Describe a restaurant and the model estimates its aggregate rating (0 to 5).</p>
+
+<div class="split">
+  <form method="post" class="panel">
+    <label>City
+      <select name="city">
+        {% for c in cities %}<option value="{{ c }}" {{ 'selected' if form.get('city') == c }}>{{ c }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Main cuisine
+      <select name="cuisine">
+        {% for c in cuisines %}<option value="{{ c }}" {{ 'selected' if form.get('cuisine') == c }}>{{ c }}</option>{% endfor %}
+      </select>
+    </label>
+    <div class="row">
+      <label>Votes
+        <input type="number" name="votes" min="0" value="{{ form.get('votes', 200) }}">
+      </label>
+      <label>Price range
+        <select name="price_range">
+          {% for p in [1,2,3,4] %}<option value="{{ p }}" {{ 'selected' if form.get('price_range')|string == p|string }}>{{ p }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <label>Average cost for two (local currency)
+      <input type="number" name="avg_cost" min="0" value="{{ form.get('avg_cost', 600) }}">
+    </label>
+    <div class="checks">
+      <label class="check"><input type="checkbox" name="table_booking" {{ 'checked' if form.get('table_booking') }}> Table booking</label>
+      <label class="check"><input type="checkbox" name="online_delivery" {{ 'checked' if form.get('online_delivery') }}> Online delivery</label>
+    </div>
+    <div class="row">
+      <label>Latitude (optional)
+        <input type="text" name="latitude" value="{{ form.get('latitude', '') }}" placeholder="city centre">
+      </label>
+      <label>Longitude (optional)
+        <input type="text" name="longitude" value="{{ form.get('longitude', '') }}" placeholder="city centre">
+      </label>
+    </div>
+    <button type="submit">Predict rating</button>
+  </form>
+
+  <div>
+    <div class="panel result {{ 'empty' if result is none }}">
+      {% if result is not none %}
+        <p class="small">Predicted rating</p>
+        <p class="big">{{ '%.2f'|format(result) }}<span> / 5</span></p>
+        <div class="meter"><i style="width: {{ result / 5 * 100 }}%"></i></div>
+      {% else %}
+        <p class="small">Fill the form and press "Predict rating".</p>
+      {% endif %}
+    </div>
+
+    <div class="panel">
+      <h2>How well the models do</h2>
+      <table>
+        <tr><th>Model</th><th class="n">MSE</th><th class="n">R²</th></tr>
+        {% for m in t1.metrics %}
+        <tr><td>{{ m.model }}</td><td class="n">{{ m.mse }}</td><td class="n">{{ m.r2 }}</td></tr>
+        {% endfor %}
+      </table>
+      <p class="note">Predictions come from the Random Forest. Lower MSE and higher R² are better.</p>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Features that influence ratings most</h2>
+  <canvas id="imp" height="110"></canvas>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+  new Chart(document.getElementById('imp'), {
+    type: 'bar',
+    data: {
+      labels: {{ t1.imp_labels|tojson }},
+      datasets: [{ data: {{ t1.imp_values|tojson }}, backgroundColor: '#F4A300', borderRadius: 3 }]
+    },
+    options: { indexAxis: 'y', plugins: { legend: { display: false } },
+               scales: { x: { grid: { color: '#e3e8ef' } }, y: { grid: { display: false } } } }
+  });
+</script>
+{% endblock %}
