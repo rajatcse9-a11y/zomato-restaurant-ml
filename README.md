@@ -2,6 +2,9 @@
 
 A machine learning project built on the Zomato restaurants dataset. It covers four tasks from the Cognifyz Machine Learning internship: rating prediction, restaurant recommendation, cuisine classification and location-based analysis. Each task is explored in a Jupyter notebook and also available as an interactive page in a Flask web app.
 
+**Live demo:** https://zomato-restaurant-ml.onrender.com
+> Hosted on a free tier, so the first visit after a long idle period can take a minute to load.
+
 ## Tasks
 
 | # | Task | Type | What it does |
