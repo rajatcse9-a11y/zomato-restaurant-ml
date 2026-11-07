@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Getting ready{% endblock %}
+{% block head %}{% if not error %}<meta http-equiv="refresh" content="8">{% endif %}{% endblock %}
+{% block content %}
+<h1>{% if error %}The app could not start{% else %}Getting the models ready{% endif %}</h1>
+{% if error %}
+  <p class="lede">Check that <code>data/</code> contains the Zomato csv file, then restart the service.</p>
+  <div class="panel"><p class="note">{{ error }}</p></div>
+{% else %}
+  <p class="lede">The models are training after a restart. This page refreshes by itself and usually finishes within a minute or two.</p>
+{% endif %}
+{% endblock %}

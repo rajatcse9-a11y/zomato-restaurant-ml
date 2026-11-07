@@ -12,6 +12,7 @@ Put the csv inside the data/ folder (same folder as this file).
 import glob
 import json
 import os
+import threading
 
 import numpy as np
 import pandas as pd
@@ -50,14 +51,6 @@ def load_df():
     raise SystemExit("data/ mein Zomato wali csv nahi mili.")
 
 
-df = load_df()
-df["Cuisines"] = df["Cuisines"].fillna("")
-df["Main"] = df["Cuisines"].str.split(",").str[0].str.strip()
-
-# lat/long clean data + city centre (used to auto-fill coordinates in forms)
-g = df[(df["Latitude"] != 0) & (df["Longitude"] != 0)].copy()
-CITY_GEO = g.groupby("City")[["Latitude", "Longitude"]].median().to_dict("index")
-CITY_COUNTRY = df.groupby("City")["Country Code"].agg(lambda x: x.mode()[0]).to_dict()
 
 
 def num(form, name, default=0.0):
@@ -110,11 +103,6 @@ def train_task1():
             "imp_values": [round(float(v), 4) for v in imp.values]}
 
 
-T1 = train_task1()
-
-main_counts = df.loc[df["Main"] != "", "Main"].value_counts()
-CUISINES = sorted(main_counts[main_counts >= 5].index.tolist())
-CITIES = sorted(df["City"].unique().tolist())
 
 
 def predict_rating(form):
@@ -142,9 +130,6 @@ def predict_rating(form):
 
 
 # ------------------------------------------------- Task 2: recommendation
-rec = df[["Restaurant Name", "City", "Cuisines", "Price range",
-          "Average Cost for two", "Aggregate rating"]].copy()
-rec = rec.drop_duplicates(subset=["Restaurant Name", "City"]).reset_index(drop=True)
 
 
 def recommend(cuisine, price_range=None, city=None, top_n=8):
@@ -204,7 +189,6 @@ def train_task3():
             "acc": acc, "report": report}
 
 
-T3 = train_task3()
 
 
 def predict_cuisine(form, top_k=3):
@@ -251,7 +235,60 @@ def build_task4():
             "n_countries": int(df["Country Code"].nunique())}
 
 
-T4 = build_task4()
+
+
+
+# ------------------------------------------------- background initialisation
+# The web server opens its port immediately; data loading and model training
+# run in a background thread. Pages show a "loading" screen until it finishes.
+df = g = rec = T1 = T3 = T4 = None
+CITY_GEO, CITY_COUNTRY, CUISINES, CITIES = {}, {}, [], []
+READY = threading.Event()
+LOAD_ERROR = None
+
+
+def _init():
+    global df, g, rec, T1, T3, T4, CITY_GEO, CITY_COUNTRY, CUISINES, CITIES, LOAD_ERROR
+    try:
+        d = load_df()
+        d["Cuisines"] = d["Cuisines"].fillna("")
+        d["Main"] = d["Cuisines"].str.split(",").str[0].str.strip()
+        df = d
+
+        # lat/long clean data + city centre (auto-fill coordinates in forms)
+        g = df[(df["Latitude"] != 0) & (df["Longitude"] != 0)].copy()
+        CITY_GEO = g.groupby("City")[["Latitude", "Longitude"]].median().to_dict("index")
+        CITY_COUNTRY = df.groupby("City")["Country Code"].agg(lambda x: x.mode()[0]).to_dict()
+
+        main_counts = df.loc[df["Main"] != "", "Main"].value_counts()
+        CUISINES = sorted(main_counts[main_counts >= 5].index.tolist())
+        CITIES = sorted(df["City"].unique().tolist())
+
+        r = df[["Restaurant Name", "City", "Cuisines", "Price range",
+                "Average Cost for two", "Aggregate rating"]].copy()
+        rec = r.drop_duplicates(subset=["Restaurant Name", "City"]).reset_index(drop=True)
+
+        T1 = train_task1()
+        T3 = train_task3()
+        T4 = build_task4()
+        READY.set()
+        print("Models ready", flush=True)
+    except BaseException as e:  # load_df raises SystemExit when the csv is missing
+        LOAD_ERROR = repr(e)
+        print("Startup failed:", LOAD_ERROR, flush=True)
+
+
+threading.Thread(target=_init, daemon=True).start()
+
+
+@app.before_request
+def wait_until_ready():
+    if READY.is_set() or request.path in ("/health", "/favicon.ico") \
+            or request.path.startswith("/static/"):
+        return None
+    if LOAD_ERROR:
+        return render_template("loading.html", page="", error=LOAD_ERROR), 500
+    return render_template("loading.html", page="", error=None), 503, {"Retry-After": "10"}
 
 
 # ----------------------------------------------------------------- routes
@@ -329,9 +366,12 @@ def api_nearby():
         ["Restaurant Name", "City", "Cuisines", "Aggregate rating", "Price range"]]
     return jsonify(records(near))
 
+
 @app.route("/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "ready": READY.is_set(), "error": LOAD_ERROR}
+
 
 if __name__ == "__main__":
-    app.run(debug=False, port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
